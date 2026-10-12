@@ -1,0 +1,111 @@
+@startuml 01_ms_auth_usuarios
+title EduSaldo · MS Auth y Usuarios (8081) · db_auth_usuarios\nHU05–HU13, HU68, HU69
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #1F4E79
+  ArrowColor #1F4E79
+}
+skinparam package {
+  BorderColor #1F4E79
+  BackgroundColor #EEF4FA
+}
+hide empty members
+
+package "MS Auth y Usuarios" {
+  enum Rol {
+    APODERADO
+    ENCARGADO
+    ADMINISTRADOR
+    AUTORIZADOR
+  }
+
+  enum EstadoCuenta {
+    PRIMER_ACCESO
+    ACTIVA
+    BLOQUEADA
+    INACTIVA
+  }
+
+  class Usuario <<Entity>> {
+    - id : Long
+    - rut : String {unique}
+    - primerNombre : String
+    - segundoNombre : String [0..1]
+    - primerApellido : String
+    - segundoApellido : String [0..1]
+    - correo : String {unique}
+    - telefono : String [0..1]
+    - passwordHash : String
+    - rol : Rol
+    - estado : EstadoCuenta
+    - intentosFallidos : int
+    - fechaCreacion : LocalDateTime
+    - ultimoAcceso : LocalDateTime [0..1]
+    --
+    + registrarIntentoFallido() : void
+    + registrarAccesoExitoso() : void
+    + cambiarPassword(nuevoHash : String) : void
+    + restablecerPasswordTemporal(hashTemporal : String) : void
+    + inactivar() : void
+    + reactivar() : void
+    + getNombreCompleto() : String
+    + haAceptadoAviso(version : String) : boolean
+  }
+
+  class TokenRecuperacion <<Entity>> {
+    - id : Long
+    - token : String {unique}
+    - fechaCreacion : LocalDateTime
+    - fechaExpiracion : LocalDateTime
+    - usado : boolean
+    --
+    + estaVigente() : boolean
+    + marcarUsado() : void
+  }
+
+  class TokenRevocado <<Entity>> {
+    - jti : String {PK}
+    - fechaRevocacion : LocalDateTime
+    - fechaExpiracion : LocalDateTime
+    - usuarioId : Long <<ref MS Auth>>
+    --
+    + haExpirado() : boolean
+  }
+
+  class ConsentimientoPrivacidad <<Entity>> {
+    - id : Long
+    - versionAviso : String
+    - fechaAceptacion : LocalDateTime
+    - ipOrigen : String [0..1]
+  }
+}
+
+Usuario "1" *-- "0..*" TokenRecuperacion : solicita >
+Usuario "1" -- "0..*" TokenRevocado : cierra sesión >
+Usuario "1" *-- "0..*" ConsentimientoPrivacidad : acepta >
+Usuario ..> Rol
+Usuario ..> EstadoCuenta
+
+note right of Usuario
+  Apoderado = Usuario con rol APODERADO
+  (sin autorregistro). Se crea solo junto a su
+  asociación con un alumno (orquestado por
+  MS Alumnos); su vínculo N:M vive allá
+  (ApoderadoAlumno). Sin alumnos activos
+  puede pasar a INACTIVA (HU18).
+  Bloqueo: 5 intentos fallidos consecutivos
+  → BLOQUEADA. Staff se crea con clave
+  temporal → PRIMER_ACCESO.
+  Nunca se elimina con historial: INACTIVA.
+  El primer ADMINISTRADOR de cada instalación
+  se crea al desplegar (carga inicial); no hay
+  superadministrador dentro del sistema.
+  Integraciones REST:
+  • 8082 Alumnos: validar y aprovisionar Apoderado
+  • 8099 Gateway: validación JWT y roles
+  • 8086 Finanzas: validación de segundo firmante (AUTORIZADOR)
+end note
+@enduml
