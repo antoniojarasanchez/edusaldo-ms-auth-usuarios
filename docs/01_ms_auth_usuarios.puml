@@ -225,4 +225,15 @@ note bottom of PoliticaAcceso
   de Usuario: lo evalúa dinámicamente PoliticaAcceso
   al autenticar usando los IntentoAcceso recientes.
 end note
+
+' Herencia
+Usuario <|-- Administrador
+Usuario <|-- Encargado
+Usuario <|-- Apoderado
+Usuario <|-- Alumno
+
+' Conexión de Enums con sus Clases
+Usuario ..> EstadoCuenta : estado
+ApoderadoAlumno ..> Parentesco : parentesco
+ApoderadoAlumno ..> EstadoAsociacion : estado
 @enduml
