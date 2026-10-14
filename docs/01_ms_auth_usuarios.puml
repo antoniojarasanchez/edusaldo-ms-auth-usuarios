@@ -1,8 +1,7 @@
-@startuml 01_ms_auth_usuarios
-title EduSaldo · MS Auth y Usuarios (8081) · db_auth_usuarios\nHU05–HU13, HU68, HU69
+@startuml 01_ms_usuarios
 skinparam classAttributeIconSize 0
 skinparam shadowing false
-skinparam linetype ortho
+skinparam linetype polyline
 skinparam class {
   BackgroundColor #FFFFFF
   BorderColor #1F4E79
@@ -13,14 +12,19 @@ skinparam package {
   BackgroundColor #EEF4FA
 }
 hide empty members
+skinparam nodesep 40
+skinparam ranksep 50
+title EduSaldo · MS Usuarios y Auth (8081) · db_usuarios\nUsuarios (herencia), relación Apoderado–Alumno, acceso y configuración
 
-package "MS Auth y Usuarios" {
-  enum Rol {
-    APODERADO
-    ENCARGADO
-    ADMINISTRADOR
-    AUTORIZADOR
-  }
+legend top right
+  Permisos por rol (marca al final de cada método):
+  «ADM» Administrador · «ENC» Encargado
+  «APO» Apoderado · «ALU» Alumno (≥ 12 años)
+  «TODOS» cualquier usuario autenticado · «SIS» sistema
+endlegend
+
+package "MS Usuarios y Auth" {
+package "Usuarios" {
 
   enum EstadoCuenta {
     PRIMER_ACCESO
@@ -29,7 +33,25 @@ package "MS Auth y Usuarios" {
     INACTIVA
   }
 
-  class Usuario <<Entity>> {
+  enum TipoCorreo {
+    INSTITUCIONAL
+    PERSONAL
+  }
+
+  enum Parentesco {
+    MADRE
+    PADRE
+    TUTOR_LEGAL
+    ABUELO_A
+    OTRO
+  }
+
+  enum EstadoAsociacion {
+    ACTIVA
+    DESVINCULADA
+  }
+
+  abstract class Usuario <<Entity>> {
     - id : Long
     - rut : String {unique}
     - primerNombre : String
@@ -37,75 +59,201 @@ package "MS Auth y Usuarios" {
     - primerApellido : String
     - segundoApellido : String [0..1]
     - correo : String {unique}
-    - telefono : String [0..1]
-    - passwordHash : String
-    - rol : Rol
+    - passwordHash : String [0..1]
     - estado : EstadoCuenta
-    - intentosFallidos : int
     - fechaCreacion : LocalDateTime
-    - ultimoAcceso : LocalDateTime [0..1]
     --
-    + registrarIntentoFallido() : void
-    + registrarAccesoExitoso() : void
-    + cambiarPassword(nuevoHash : String) : void
-    + restablecerPasswordTemporal(hashTemporal : String) : void
-    + inactivar() : void
-    + reactivar() : void
+    + {abstract} getRol() : String
     + getNombreCompleto() : String
-    + haAceptadoAviso(version : String) : boolean
+    + puedeIniciarSesion() : boolean
+    + cambiarPassword(actual : String, nueva : String) : void «TODOS»
+    + inactivar() : void «ADM»
+    + reactivar() : void «ADM»
+    + restablecerPassword() : void «ADM»
   }
 
-  class TokenRecuperacion <<Entity>> {
+  class Administrador <<Entity>> {
+    - tipoCorreo : TipoCorreo
+    --
+    + getRol() : String
+  }
+
+  class Encargado <<Entity>> {
+    - tipoCorreo : TipoCorreo
+    --
+    + getRol() : String
+  }
+
+  class Apoderado <<Entity>> {
+    - telefono : String
+    --
+    + getRol() : String
+    + getAlumnosActivos() : List<Alumno> «APO»
+  }
+
+  class Alumno <<Entity>> {
+    - fechaNacimiento : LocalDate
+    - curso : String
+    --
+    + getRol() : String
+    + calcularEdad() : int
+    + puedeIniciarSesion() : boolean
+    + puedeReservar() : boolean
+    + asociarApoderado(apoderado : Apoderado, parentesco : Parentesco) : ApoderadoAlumno «ADM»
+    + desvincularApoderado(asociacion : ApoderadoAlumno, motivo : String) : void «ADM»
+    + actualizarCurso(curso : String) : void «ADM»
+  }
+
+  class ApoderadoAlumno <<Entity>> {
     - id : Long
-    - token : String {unique}
-    - fechaCreacion : LocalDateTime
-    - fechaExpiracion : LocalDateTime
-    - usado : boolean
+    - parentesco : Parentesco
+    - estado : EstadoAsociacion
+    - fechaAsociacion : LocalDateTime
+    - fechaDesvinculacion : LocalDateTime [0..1]
+    - motivoDesvinculacion : String [0..1]
     --
-    + estaVigente() : boolean
-    + marcarUsado() : void
+    + desvincular(motivo : String) : void «ADM»
   }
 
-  class TokenRevocado <<Entity>> {
-    - jti : String {PK}
-    - fechaRevocacion : LocalDateTime
-    - fechaExpiracion : LocalDateTime
-    - usuarioId : Long <<ref MS Auth>>
+}
+package "Acceso" {
+  class PoliticaAcceso <<Entity>> {
+    - id : Long
+    - maxIntentosFallidos : int
+    - minutosBloqueo : int
+    - minutosVigenciaSesion : int
     --
-    + haExpirado() : boolean
+    + debeBloquear(intentosRecientes : int) : boolean «SIS»
+    + modificar(...) : void «ADM»
+  }
+
+  class IntentoAcceso <<Entity>> {
+    - id : Long
+    - correo : String
+    - fecha : LocalDateTime
+    - exitoso : boolean
   }
 
   class ConsentimientoPrivacidad <<Entity>> {
     - id : Long
     - versionAviso : String
     - fechaAceptacion : LocalDateTime
-    - ipOrigen : String [0..1]
+    --
+    + aceptar(version : String) : void «APO» «ALU»
+  }
+
+  class TokenRecuperacion <<Entity>> {
+    - id : Long
+    - token : String {unique}
+    - fechaExpiracion : LocalDateTime
+    - usado : boolean
+    --
+    + estaVigente() : boolean
+  }
+
+}
+package "Carga y configuración" {
+  class ImportacionNomina <<Entity>> {
+    - id : Long
+    - nombreArchivo : String
+    - fecha : LocalDateTime
+    --
+    + previsualizar() : void «ADM»
+    + confirmar() : void «ADM»
+  }
+
+  class DetalleImportacion <<Entity>> {
+    - id : Long
+    - numeroFila : int
+    - rutAlumno : String
+    - rutApoderado : String
+    - estado : String
+    - observacion : String [0..1]
+  }
+
+  class ConfiguracionInstitucional <<Entity>> {
+    - id : Long
+    - nombreEstablecimiento : String
+    - nombreLibreria : String
+    - correoContacto : String
+    - logoUrl : String
+    --
+    + actualizar(...) : void «ADM»
+  }
+
+  class ParametroSistema <<Entity>> {
+    - clave : String {PK}
+    - valor : String
+    --
+    + modificar(valor : String) : void «ADM»
+  }
+
+  class RegistroAuditoria <<Entity>> {
+    - id : Long
+    - fechaHora : LocalDateTime
+    - usuarioId : Long
+    - accion : String
+    - entidad : String
+    - entidadId : String
+    - detalle : String
+  }
+
+  class ConsultaContacto <<Entity>> {
+    - id : Long
+    - primerNombre : String
+    - primerApellido : String
+    - correo : String
+    - mensaje : String
+    - fecha : LocalDateTime
   }
 }
+}
 
-Usuario "1" *-- "0..*" TokenRecuperacion : solicita >
-Usuario "1" -- "0..*" TokenRevocado : cierra sesión >
+Usuario <|-- Administrador
+Usuario <|-- Encargado
+Usuario <|-- Apoderado
+Usuario <|-- Alumno
+
+Apoderado "1" -- "0..*" ApoderadoAlumno : tiene >
+ApoderadoAlumno "1..*" -- "1" Alumno : de >
+
+Usuario "1" *-- "0..*" TokenRecuperacion
 Usuario "1" *-- "0..*" ConsentimientoPrivacidad : acepta >
-Usuario ..> Rol
-Usuario ..> EstadoCuenta
+PoliticaAcceso ..> IntentoAcceso : evalúa
+ImportacionNomina "1" *-- "1..*" DetalleImportacion
+DetalleImportacion ..> Alumno : crea
+DetalleImportacion ..> Apoderado : crea / reutiliza
+RegistroAuditoria ..> Usuario : usuarioId
 
-note right of Usuario
-  Apoderado = Usuario con rol APODERADO
-  (sin autorregistro). Se crea solo junto a su
-  asociación con un alumno (orquestado por
-  MS Alumnos); su vínculo N:M vive allá
-  (ApoderadoAlumno). Sin alumnos activos
-  puede pasar a INACTIVA (HU18).
-  Bloqueo: 5 intentos fallidos consecutivos
-  → BLOQUEADA. Staff se crea con clave
-  temporal → PRIMER_ACCESO.
-  Nunca se elimina con historial: INACTIVA.
-  El primer ADMINISTRADOR de cada instalación
-  se crea al desplegar (carga inicial); no hay
-  superadministrador dentro del sistema.
-  Integraciones REST:
-  • 8082 Alumnos: validar y aprovisionar Apoderado
-  • 8099 Gateway: validación JWT y roles
-  • 8086 Finanzas: validación de segundo firmante (AUTORIZADOR)
+note right of Alumno
+  Alumno ≥ 12 años: inicia sesión, consulta su
+  saldo y puede reservar. Alumno < 12: no inicia
+  sesión (sin contraseña); se identifica en el mesón
+  y reserva su apoderado.
+  Correo institucional obligatorio.
+end note
+
+note bottom of ApoderadoAlumno
+  Relación muchos a muchos Apoderado–Alumno
+  resuelta con la clase ApoderadoAlumno:
+  un alumno tiene 1..* apoderados (mamá, papá, abuelo…)
+  y un apoderado tiene 0..* alumnos (hermanos).
+  El apoderado se crea primero; luego el Administrador
+  asocia el alumno a ese apoderado ya existente.
+  No se borra: se desvincula con fecha y motivo.
+end note
+
+note bottom of Encargado
+  Administrador y Encargado: correo institucional
+  por defecto; se permite uno personal (TipoCorreo).
+  Apoderado: correo personal.
+  Ya no existe el rol Autorizador:
+  el Administrador aprueba.
+end note
+
+note bottom of PoliticaAcceso
+  El bloqueo por intentos fallidos no está en Usuario:
+  lo resuelve la política de acceso al autenticar
+  (Spring Security), usando los IntentoAcceso recientes.
 end note
 @enduml
