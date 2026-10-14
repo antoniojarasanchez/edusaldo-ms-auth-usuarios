@@ -1,4 +1,4 @@
-@startuml 01_ms_usuarios
+@startuml 01_ms_auth_usuarios
 skinparam classAttributeIconSize 0
 skinparam shadowing false
 skinparam linetype polyline
@@ -24,25 +24,19 @@ legend top right
 endlegend
 
 package "MS Usuarios y Auth" {
+
 package "Usuarios" {
 
   enum EstadoCuenta {
     PRIMER_ACCESO
     ACTIVA
-    BLOQUEADA
     INACTIVA
-  }
-
-  enum TipoCorreo {
-    INSTITUCIONAL
-    PERSONAL
   }
 
   enum Parentesco {
     MADRE
     PADRE
     TUTOR_LEGAL
-    ABUELO_A
     OTRO
   }
 
@@ -51,14 +45,14 @@ package "Usuarios" {
     DESVINCULADA
   }
 
-  abstract class Usuario <<Entity>> {
+  abstract class Usuario {
     - id : Long
-    - rut : String {unique}
+    - rut : String
     - primerNombre : String
     - segundoNombre : String [0..1]
     - primerApellido : String
     - segundoApellido : String [0..1]
-    - correo : String {unique}
+    - correo : String
     - passwordHash : String [0..1]
     - estado : EstadoCuenta
     - fechaCreacion : LocalDateTime
@@ -72,26 +66,24 @@ package "Usuarios" {
     + restablecerPassword() : void «ADM»
   }
 
-  class Administrador <<Entity>> {
-    - tipoCorreo : TipoCorreo
+  class Administrador {
     --
     + getRol() : String
   }
 
-  class Encargado <<Entity>> {
-    - tipoCorreo : TipoCorreo
+  class Encargado {
     --
     + getRol() : String
   }
 
-  class Apoderado <<Entity>> {
+  class Apoderado {
     - telefono : String
     --
     + getRol() : String
     + getAlumnosActivos() : List<Alumno> «APO»
   }
 
-  class Alumno <<Entity>> {
+  class Alumno {
     - fechaNacimiento : LocalDate
     - curso : String
     --
@@ -104,8 +96,7 @@ package "Usuarios" {
     + actualizarCurso(curso : String) : void «ADM»
   }
 
-  class ApoderadoAlumno <<Entity>> {
-    - id : Long
+  class ApoderadoAlumno {
     - parentesco : Parentesco
     - estado : EstadoAsociacion
     - fechaAsociacion : LocalDateTime
@@ -116,9 +107,10 @@ package "Usuarios" {
   }
 
 }
-package "Acceso" {
-  class PoliticaAcceso <<Entity>> {
-    - id : Long
+
+package "Acceso y seguridad" {
+
+  class PoliticaAcceso {
     - maxIntentosFallidos : int
     - minutosBloqueo : int
     - minutosVigenciaSesion : int
@@ -127,24 +119,21 @@ package "Acceso" {
     + modificar(...) : void «ADM»
   }
 
-  class IntentoAcceso <<Entity>> {
-    - id : Long
+  class IntentoAcceso {
     - correo : String
     - fecha : LocalDateTime
     - exitoso : boolean
   }
 
-  class ConsentimientoPrivacidad <<Entity>> {
-    - id : Long
+  class ConsentimientoPrivacidad {
     - versionAviso : String
     - fechaAceptacion : LocalDateTime
     --
     + aceptar(version : String) : void «APO» «ALU»
   }
 
-  class TokenRecuperacion <<Entity>> {
-    - id : Long
-    - token : String {unique}
+  class TokenRecuperacion {
+    - token : String
     - fechaExpiracion : LocalDateTime
     - usado : boolean
     --
@@ -152,27 +141,10 @@ package "Acceso" {
   }
 
 }
-package "Carga y configuración" {
-  class ImportacionNomina <<Entity>> {
-    - id : Long
-    - nombreArchivo : String
-    - fecha : LocalDateTime
-    --
-    + previsualizar() : void «ADM»
-    + confirmar() : void «ADM»
-  }
 
-  class DetalleImportacion <<Entity>> {
-    - id : Long
-    - numeroFila : int
-    - rutAlumno : String
-    - rutApoderado : String
-    - estado : String
-    - observacion : String [0..1]
-  }
+package "Configuración y auditoría" {
 
-  class ConfiguracionInstitucional <<Entity>> {
-    - id : Long
+  class ConfiguracionInstitucional {
     - nombreEstablecimiento : String
     - nombreLibreria : String
     - correoContacto : String
@@ -181,15 +153,14 @@ package "Carga y configuración" {
     + actualizar(...) : void «ADM»
   }
 
-  class ParametroSistema <<Entity>> {
-    - clave : String {PK}
+  class ParametroSistema {
+    - clave : String
     - valor : String
     --
     + modificar(valor : String) : void «ADM»
   }
 
-  class RegistroAuditoria <<Entity>> {
-    - id : Long
+  class RegistroAuditoria {
     - fechaHora : LocalDateTime
     - usuarioId : Long
     - accion : String
@@ -198,62 +169,60 @@ package "Carga y configuración" {
     - detalle : String
   }
 
-  class ConsultaContacto <<Entity>> {
-    - id : Long
+  class ConsultaContacto {
     - primerNombre : String
     - primerApellido : String
     - correo : String
     - mensaje : String
     - fecha : LocalDateTime
   }
-}
+
 }
 
+}
+
+' Herencia
 Usuario <|-- Administrador
 Usuario <|-- Encargado
 Usuario <|-- Apoderado
 Usuario <|-- Alumno
 
-Apoderado "1" -- "0..*" ApoderadoAlumno : tiene >
-ApoderadoAlumno "1..*" -- "1" Alumno : de >
+' Relación N:M modelada formalmente con clase de asociación UML
+Apoderado "1..*" -- "0..*" Alumno : asociados >
+(Apoderado, Alumno) .. ApoderadoAlumno
 
+' Composiciones y dependencias
 Usuario "1" *-- "0..*" TokenRecuperacion
 Usuario "1" *-- "0..*" ConsentimientoPrivacidad : acepta >
 PoliticaAcceso ..> IntentoAcceso : evalúa
-ImportacionNomina "1" *-- "1..*" DetalleImportacion
-DetalleImportacion ..> Alumno : crea
-DetalleImportacion ..> Apoderado : crea / reutiliza
-RegistroAuditoria ..> Usuario : usuarioId
+RegistroAuditoria ..> Usuario : audita >
 
 note right of Alumno
-  Alumno ≥ 12 años: inicia sesión, consulta su
-  saldo y puede reservar. Alumno < 12: no inicia
-  sesión (sin contraseña); se identifica en el mesón
-  y reserva su apoderado.
-  Correo institucional obligatorio.
+  Alumno ≥ 12 años: inicia sesión con correo
+  institucional, consulta saldo y puede reservar.
+  Alumno < 12: no inicia sesión; se identifica
+  en mesón y reserva su apoderado.
 end note
 
 note bottom of ApoderadoAlumno
-  Relación muchos a muchos Apoderado–Alumno
-  resuelta con la clase ApoderadoAlumno:
-  un alumno tiene 1..* apoderados (mamá, papá, abuelo…)
-  y un apoderado tiene 0..* alumnos (hermanos).
-  El apoderado se crea primero; luego el Administrador
-  asocia el alumno a ese apoderado ya existente.
+  Clase de asociación Apoderado–Alumno:
+  un alumno tiene 1..* apoderados y un apoderado
+  tiene 0..* alumnos.
+  Alta atómica en HU15: no existe apoderado sin
+  alumno ni alumno sin apoderado.
   No se borra: se desvincula con fecha y motivo.
 end note
 
 note bottom of Encargado
-  Administrador y Encargado: correo institucional
-  por defecto; se permite uno personal (TipoCorreo).
-  Apoderado: correo personal.
+  Administrador y Encargado usan correo institucional.
+  Apoderado usa correo personal.
   Ya no existe el rol Autorizador:
   el Administrador aprueba.
 end note
 
 note bottom of PoliticaAcceso
-  El bloqueo por intentos fallidos no está en Usuario:
-  lo resuelve la política de acceso al autenticar
-  (Spring Security), usando los IntentoAcceso recientes.
+  El bloqueo por intentos fallidos no es un estado
+  de Usuario: lo evalúa dinámicamente PoliticaAcceso
+  al autenticar usando los IntentoAcceso recientes.
 end note
 @enduml
