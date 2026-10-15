@@ -40,10 +40,6 @@ package "Usuarios" {
     OTRO
   }
 
-  enum EstadoAsociacion {
-    ACTIVA
-    DESVINCULADA
-  }
 
   abstract class Usuario {
     - id : Long
@@ -92,18 +88,13 @@ package "Usuarios" {
     + puedeIniciarSesion() : boolean
     + puedeReservar() : boolean
     + asociarApoderado(apoderado : Apoderado, parentesco : Parentesco) : ApoderadoAlumno «ADM»
-    + desvincularApoderado(asociacion : ApoderadoAlumno, motivo : String) : void «ADM»
+    + desvincularApoderado(apoderado : Apoderado, motivo : String) : void «ADM»
     + actualizarCurso(curso : String) : void «ADM»
   }
 
   class ApoderadoAlumno {
     - parentesco : Parentesco
-    - estado : EstadoAsociacion
     - fechaAsociacion : LocalDateTime
-    - fechaDesvinculacion : LocalDateTime [0..1]
-    - motivoDesvinculacion : String [0..1]
-    --
-    + desvincular(motivo : String) : void «ADM»
   }
 
 }
@@ -207,10 +198,16 @@ end note
 note bottom of ApoderadoAlumno
   Clase de asociación Apoderado–Alumno:
   un alumno tiene 1..* apoderados y un apoderado
-  tiene 0..* alumnos.
+  tiene 0..* alumnos (el 0 solo ocurre tras desvincular
+  a todos sus pupilos; el alta siempre crea el par).
   Alta atómica en HU15: no existe apoderado sin
   alumno ni alumno sin apoderado.
-  No se borra: se desvincula con fecha y motivo.
+  Al desvincular, la instancia se elimina (sin borrado
+  lógico); la fecha, el administrador y el motivo de
+  desvinculación se auditan en RegistroAuditoria.
+  El parentesco reside aquí porque una persona puede
+  tener roles distintos por pupilo (ej. MADRE de uno
+  y TUTOR_LEGAL de otro).
 end note
 
 note bottom of Encargado
@@ -226,14 +223,7 @@ note bottom of PoliticaAcceso
   al autenticar usando los IntentoAcceso recientes.
 end note
 
-' Herencia
-Usuario <|-- Administrador
-Usuario <|-- Encargado
-Usuario <|-- Apoderado
-Usuario <|-- Alumno
-
 ' Conexión de Enums con sus Clases
 Usuario ..> EstadoCuenta : estado
 ApoderadoAlumno ..> Parentesco : parentesco
-ApoderadoAlumno ..> EstadoAsociacion : estado
 @enduml
