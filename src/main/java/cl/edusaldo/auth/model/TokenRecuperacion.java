@@ -4,16 +4,17 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tokens_recuperacion")
+@Table(name = "tokens_recuperacion", indexes = {
+        @Index(name = "idx_token_recuperacion_token", columnList = "token")
+})
 public class TokenRecuperacion {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "usuario_id", nullable = false)
-    private Usuario usuario;
+    @Column(name = "usuario_id", nullable = false)
+    private Long usuarioId;
 
     @Column(name = "token", nullable = false, unique = true)
     private String token;
@@ -30,8 +31,8 @@ public class TokenRecuperacion {
     public TokenRecuperacion() {
     }
 
-    public TokenRecuperacion(Usuario usuario, String token, LocalDateTime fechaExpiracion) {
-        this.usuario = usuario;
+    public TokenRecuperacion(Long usuarioId, String token, LocalDateTime fechaExpiracion) {
+        this.usuarioId = usuarioId;
         this.token = token;
         this.fechaExpiracion = fechaExpiracion;
         this.fechaCreacion = LocalDateTime.now();
@@ -47,9 +48,15 @@ public class TokenRecuperacion {
     }
 
     public Long getId() { return id; }
-    public Usuario getUsuario() { return usuario; }
+    public void setId(Long id) { this.id = id; }
+    public Long getUsuarioId() { return usuarioId; }
+    public void setUsuarioId(Long usuarioId) { this.usuarioId = usuarioId; }
     public String getToken() { return token; }
+    public void setToken(String token) { this.token = token; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
+    public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
     public LocalDateTime getFechaExpiracion() { return fechaExpiracion; }
+    public void setFechaExpiracion(LocalDateTime fechaExpiracion) { this.fechaExpiracion = fechaExpiracion; }
     public boolean isUsado() { return usado; }
+    public void setUsado(boolean usado) { this.usado = usado; }
 }

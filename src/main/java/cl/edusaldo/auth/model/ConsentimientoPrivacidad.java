@@ -11,9 +11,8 @@ public class ConsentimientoPrivacidad {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "usuario_id", nullable = false)
-    private Usuario usuario;
+    @Column(name = "usuario_id", nullable = false)
+    private Long usuarioId;
 
     @Column(name = "version_aviso", nullable = false, length = 50)
     private String versionAviso;
@@ -27,16 +26,55 @@ public class ConsentimientoPrivacidad {
     public ConsentimientoPrivacidad() {
     }
 
-    public ConsentimientoPrivacidad(Usuario usuario, String versionAviso, String ipOrigen) {
-        this.usuario = usuario;
+    public ConsentimientoPrivacidad(Long usuarioId, String versionAviso, String ipOrigen) {
+        this.usuarioId = usuarioId;
         this.versionAviso = versionAviso;
         this.ipOrigen = ipOrigen;
         this.fechaAceptacion = LocalDateTime.now();
     }
 
-    public Long getId() { return id; }
-    public Usuario getUsuario() { return usuario; }
-    public String getVersionAviso() { return versionAviso; }
-    public LocalDateTime getFechaAceptacion() { return fechaAceptacion; }
-    public String getIpOrigen() { return ipOrigen; }
+    public void aceptar(String version) {
+        this.versionAviso = version;
+        this.fechaAceptacion = LocalDateTime.now();
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getUsuarioId() {
+        return usuarioId;
+    }
+
+    public void setUsuarioId(Long usuarioId) {
+        this.usuarioId = usuarioId;
+    }
+
+    public String getVersionAviso() {
+        return versionAviso;
+    }
+
+    public void setVersionAviso(String versionAviso) {
+        this.versionAviso = versionAviso;
+    }
+
+    public LocalDateTime getFechaAceptacion() {
+        return fechaAceptacion;
+    }
+
+    public void setFechaAceptacion(LocalDateTime fechaAceptacion) {
+        this.fechaAceptacion = fechaAceptacion;
+    }
+
+    public String getIpOrigen() {
+        return ipOrigen;
+    }
+
+    public void setIpOrigen(String ipOrigen) {
+        this.ipOrigen = ipOrigen;
+    }
 }

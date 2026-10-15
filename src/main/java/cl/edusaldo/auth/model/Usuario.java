@@ -5,7 +5,9 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "usuarios")
-public class Usuario {
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "tipo_usuario", discriminatorType = DiscriminatorType.STRING)
+public abstract class Usuario {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,22 +31,12 @@ public class Usuario {
     @Column(name = "correo", nullable = false, unique = true, length = 150)
     private String correo;
 
-    @Column(name = "telefono", length = 30)
-    private String telefono;
-
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "rol", nullable = false, length = 30)
-    private Rol rol;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false, length = 30)
     private EstadoCuenta estado = EstadoCuenta.PRIMER_ACCESO;
-
-    @Column(name = "intentos_fallidos", nullable = false)
-    private int intentosFallidos = 0;
 
     @Column(name = "fecha_creacion", nullable = false, updatable = false)
     private LocalDateTime fechaCreacion = LocalDateTime.now();
@@ -55,40 +47,39 @@ public class Usuario {
     public Usuario() {
     }
 
-    public Usuario(String rut, String primerNombre, String primerApellido, String correo, String passwordHash, Rol rol) {
+    public Usuario(String rut, String primerNombre, String primerApellido, String correo, String passwordHash) {
         this.rut = rut;
         this.primerNombre = primerNombre;
         this.primerApellido = primerApellido;
         this.correo = correo;
         this.passwordHash = passwordHash;
-        this.rol = rol;
         this.estado = EstadoCuenta.PRIMER_ACCESO;
         this.fechaCreacion = LocalDateTime.now();
     }
 
-    // Reglas de negocio e invariantes
-    public void registrarIntentoFallido() {
-        this.intentosFallidos++;
-        if (this.intentosFallidos >= 5) {
-            this.estado = EstadoCuenta.BLOQUEADA;
+    public abstract String getRol();
+
+    public String getNombreCompleto() {
+        StringBuilder sb = new StringBuilder(primerNombre != null ? primerNombre.trim() : "");
+        if (segundoNombre != null && !segundoNombre.isBlank()) {
+            sb.append(" ").append(segundoNombre.trim());
         }
+        if (primerApellido != null && !primerApellido.isBlank()) {
+            sb.append(" ").append(primerApellido.trim());
+        }
+        if (segundoApellido != null && !segundoApellido.isBlank()) {
+            sb.append(" ").append(segundoApellido.trim());
+        }
+        return sb.toString().trim();
     }
 
-    public void registrarAccesoExitoso() {
-        this.intentosFallidos = 0;
-        this.ultimoAcceso = LocalDateTime.now();
+    public boolean puedeIniciarSesion() {
+        return this.estado == EstadoCuenta.ACTIVA || this.estado == EstadoCuenta.PRIMER_ACCESO;
     }
 
     public void cambiarPassword(String nuevoHash) {
         this.passwordHash = nuevoHash;
         this.estado = EstadoCuenta.ACTIVA;
-        this.intentosFallidos = 0;
-    }
-
-    public void restablecerPasswordTemporal(String hashTemporal) {
-        this.passwordHash = hashTemporal;
-        this.estado = EstadoCuenta.PRIMER_ACCESO;
-        this.intentosFallidos = 0;
     }
 
     public void inactivar() {
@@ -99,16 +90,13 @@ public class Usuario {
         this.estado = EstadoCuenta.ACTIVA;
     }
 
-    public String getNombreCompleto() {
-        StringBuilder sb = new StringBuilder(primerNombre);
-        if (segundoNombre != null && !segundoNombre.isBlank()) {
-            sb.append(" ").append(segundoNombre);
-        }
-        sb.append(" ").append(primerApellido);
-        if (segundoApellido != null && !segundoApellido.isBlank()) {
-            sb.append(" ").append(segundoApellido);
-        }
-        return sb.toString();
+    public void restablecerPassword(String hashTemporal) {
+        this.passwordHash = hashTemporal;
+        this.estado = EstadoCuenta.PRIMER_ACCESO;
+    }
+
+    public void registrarAccesoExitoso() {
+        this.ultimoAcceso = LocalDateTime.now();
     }
 
     // Getters y Setters
@@ -126,17 +114,12 @@ public class Usuario {
     public void setSegundoApellido(String segundoApellido) { this.segundoApellido = segundoApellido; }
     public String getCorreo() { return correo; }
     public void setCorreo(String correo) { this.correo = correo; }
-    public String getTelefono() { return telefono; }
-    public void setTelefono(String telefono) { this.telefono = telefono; }
     public String getPasswordHash() { return passwordHash; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
-    public Rol getRol() { return rol; }
-    public void setRol(Rol rol) { this.rol = rol; }
     public EstadoCuenta getEstado() { return estado; }
     public void setEstado(EstadoCuenta estado) { this.estado = estado; }
-    public int getIntentosFallidos() { return intentosFallidos; }
-    public void setIntentosFallidos(int intentosFallidos) { this.intentosFallidos = intentosFallidos; }
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
+    public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
     public LocalDateTime getUltimoAcceso() { return ultimoAcceso; }
     public void setUltimoAcceso(LocalDateTime ultimoAcceso) { this.ultimoAcceso = ultimoAcceso; }
 }

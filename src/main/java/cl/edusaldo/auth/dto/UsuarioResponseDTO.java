@@ -1,8 +1,11 @@
 package cl.edusaldo.auth.dto;
 
+import cl.edusaldo.auth.model.Alumno;
+import cl.edusaldo.auth.model.Apoderado;
 import cl.edusaldo.auth.model.EstadoCuenta;
-import cl.edusaldo.auth.model.Rol;
 import cl.edusaldo.auth.model.Usuario;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public class UsuarioResponseDTO {
     private Long id;
@@ -14,8 +17,17 @@ public class UsuarioResponseDTO {
     private String nombreCompleto;
     private String correo;
     private String telefono;
-    private Rol rol;
+    private String rol;
     private EstadoCuenta estado;
+    private LocalDateTime fechaCreacion;
+    private LocalDateTime ultimoAcceso;
+
+    // Campos específicos de Alumno
+    private String curso;
+    private LocalDate fechaNacimiento;
+    private Integer edad;
+    private Boolean puedeIniciarSesion;
+    private Boolean puedeReservar;
 
     public UsuarioResponseDTO() {}
 
@@ -28,9 +40,20 @@ public class UsuarioResponseDTO {
         this.segundoApellido = u.getSegundoApellido();
         this.nombreCompleto = u.getNombreCompleto();
         this.correo = u.getCorreo();
-        this.telefono = u.getTelefono();
         this.rol = u.getRol();
         this.estado = u.getEstado();
+        this.fechaCreacion = u.getFechaCreacion();
+        this.ultimoAcceso = u.getUltimoAcceso();
+
+        if (u instanceof Apoderado apoderado) {
+            this.telefono = apoderado.getTelefono();
+        } else if (u instanceof Alumno alumno) {
+            this.curso = alumno.getCurso();
+            this.fechaNacimiento = alumno.getFechaNacimiento();
+            this.edad = alumno.calcularEdad();
+            this.puedeIniciarSesion = alumno.puedeIniciarSesion();
+            this.puedeReservar = alumno.puedeReservar();
+        }
     }
 
     public Long getId() { return id; }
@@ -42,6 +65,13 @@ public class UsuarioResponseDTO {
     public String getNombreCompleto() { return nombreCompleto; }
     public String getCorreo() { return correo; }
     public String getTelefono() { return telefono; }
-    public Rol getRol() { return rol; }
+    public String getRol() { return rol; }
     public EstadoCuenta getEstado() { return estado; }
+    public LocalDateTime getFechaCreacion() { return fechaCreacion; }
+    public LocalDateTime getUltimoAcceso() { return ultimoAcceso; }
+    public String getCurso() { return curso; }
+    public LocalDate getFechaNacimiento() { return fechaNacimiento; }
+    public Integer getEdad() { return edad; }
+    public Boolean getPuedeIniciarSesion() { return puedeIniciarSesion; }
+    public Boolean getPuedeReservar() { return puedeReservar; }
 }

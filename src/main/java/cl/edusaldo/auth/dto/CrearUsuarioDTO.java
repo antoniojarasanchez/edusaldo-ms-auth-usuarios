@@ -4,6 +4,7 @@ import cl.edusaldo.auth.model.Rol;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 
 public class CrearUsuarioDTO {
 
@@ -29,6 +30,9 @@ public class CrearUsuarioDTO {
     @NotNull(message = "El rol es obligatorio")
     private Rol rol;
 
+    private String curso;
+    private LocalDate fechaNacimiento;
+
     public CrearUsuarioDTO() {}
 
     public String getRut() { return rut; }
@@ -47,4 +51,8 @@ public class CrearUsuarioDTO {
     public void setTelefono(String telefono) { this.telefono = telefono; }
     public Rol getRol() { return rol; }
     public void setRol(Rol rol) { this.rol = rol; }
+    public String getCurso() { return curso; }
+    public void setCurso(String curso) { this.curso = curso; }
+    public LocalDate getFechaNacimiento() { return fechaNacimiento; }
+    public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
 }

@@ -1,7 +1,6 @@
 package cl.edusaldo.auth.dto;
 
 import cl.edusaldo.auth.model.EstadoCuenta;
-import cl.edusaldo.auth.model.Rol;
 
 public class LoginResponseDTO {
     private String token;
@@ -9,12 +8,12 @@ public class LoginResponseDTO {
     private String rut;
     private String nombreCompleto;
     private String correo;
-    private Rol rol;
+    private String rol;
     private EstadoCuenta estado;
 
     public LoginResponseDTO() {}
 
-    public LoginResponseDTO(String token, Long usuarioId, String rut, String nombreCompleto, String correo, Rol rol, EstadoCuenta estado) {
+    public LoginResponseDTO(String token, Long usuarioId, String rut, String nombreCompleto, String correo, String rol, EstadoCuenta estado) {
         this.token = token;
         this.usuarioId = usuarioId;
         this.rut = rut;
@@ -25,10 +24,17 @@ public class LoginResponseDTO {
     }
 
     public String getToken() { return token; }
+    public void setToken(String token) { this.token = token; }
     public Long getUsuarioId() { return usuarioId; }
+    public void setUsuarioId(Long usuarioId) { this.usuarioId = usuarioId; }
     public String getRut() { return rut; }
+    public void setRut(String rut) { this.rut = rut; }
     public String getNombreCompleto() { return nombreCompleto; }
+    public void setNombreCompleto(String nombreCompleto) { this.nombreCompleto = nombreCompleto; }
     public String getCorreo() { return correo; }
-    public Rol getRol() { return rol; }
+    public void setCorreo(String correo) { this.correo = correo; }
+    public String getRol() { return rol; }
+    public void setRol(String rol) { this.rol = rol; }
     public EstadoCuenta getEstado() { return estado; }
+    public void setEstado(EstadoCuenta estado) { this.estado = estado; }
 }

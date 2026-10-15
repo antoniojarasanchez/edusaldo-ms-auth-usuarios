@@ -3,10 +3,18 @@ package cl.edusaldo.auth;
 import cl.edusaldo.auth.dto.CrearUsuarioDTO;
 import cl.edusaldo.auth.dto.LoginRequestDTO;
 import cl.edusaldo.auth.dto.LoginResponseDTO;
+import cl.edusaldo.auth.model.Administrador;
+import cl.edusaldo.auth.model.Encargado;
 import cl.edusaldo.auth.model.EstadoCuenta;
 import cl.edusaldo.auth.model.Rol;
 import cl.edusaldo.auth.model.Usuario;
+import cl.edusaldo.auth.repository.AlumnoRepository;
+import cl.edusaldo.auth.repository.ApoderadoAlumnoRepository;
+import cl.edusaldo.auth.repository.ApoderadoRepository;
+import cl.edusaldo.auth.repository.TokenRecuperacionRepository;
 import cl.edusaldo.auth.repository.UsuarioRepository;
+import cl.edusaldo.auth.service.AuditoriaService;
+import cl.edusaldo.auth.service.PoliticaAccesoService;
 import cl.edusaldo.auth.service.UsuarioService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,10 +31,23 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("Pruebas Unitarias de UsuarioService")
 class UsuarioServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+    @Mock
+    private AlumnoRepository alumnoRepository;
+    @Mock
+    private ApoderadoRepository apoderadoRepository;
+    @Mock
+    private ApoderadoAlumnoRepository apoderadoAlumnoRepository;
+    @Mock
+    private PoliticaAccesoService politicaAccesoService;
+    @Mock
+    private AuditoriaService auditoriaService;
+    @Mock
+    private TokenRecuperacionRepository tokenRecuperacionRepository;
 
     @InjectMocks
     private UsuarioService usuarioService;
@@ -35,49 +56,40 @@ class UsuarioServiceTest {
 
     @BeforeEach
     void setUp() {
-        usuarioPrueba = new Usuario("15.666.777-8", "Antonio", "Jara", "admin@colegio.cl", "hash_secreto_123", Rol.ADMINISTRADOR);
+        usuarioPrueba = new Administrador("15.666.777-8", "Antonio", "Jara", "admin@colegio.cl", "hash_secreto_123");
         usuarioPrueba.setId(1L);
         usuarioPrueba.setEstado(EstadoCuenta.ACTIVA);
     }
 
     @Test
-    @DisplayName("1. Bloqueo de cuenta tras cinco intentos consecutivos fallidos (HU10)")
-    void testBloqueoTrasCincoIntentosFallidos() {
+    @DisplayName("1. Bloqueo de cuenta dinámico tras intentos consecutivos fallidos (HU10)")
+    void testBloqueoDinamicoIntentosFallidos() {
         when(usuarioRepository.findByRut("15.666.777-8")).thenReturn(Optional.of(usuarioPrueba));
-        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(i -> i.getArgument(0));
+        doThrow(new IllegalStateException("Cuenta bloqueada temporalmente por superar el límite de 5 intentos fallidos"))
+                .when(politicaAccesoService).evaluarBloqueo("admin@colegio.cl");
 
-        LoginRequestDTO dtoErroneo = new LoginRequestDTO("15.666.777-8", "clave_incorrecta");
+        LoginRequestDTO dto = new LoginRequestDTO("15.666.777-8", "clave_incorrecta");
 
-        // 4 intentos fallidos
-        for (int i = 1; i <= 4; i++) {
-            assertThrows(IllegalArgumentException.class, () -> usuarioService.login(dtoErroneo));
-            assertEquals(i, usuarioPrueba.getIntentosFallidos());
-            assertEquals(EstadoCuenta.ACTIVA, usuarioPrueba.getEstado());
-        }
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> usuarioService.login(dto));
+        assertTrue(ex.getMessage().contains("bloqueada temporalmente"));
 
-        // 5to intento fallido -> debe bloquear
-        assertThrows(IllegalStateException.class, () -> usuarioService.login(dtoErroneo));
-        assertEquals(5, usuarioPrueba.getIntentosFallidos());
-        assertEquals(EstadoCuenta.BLOQUEADA, usuarioPrueba.getEstado());
-
-        // 6to intento -> rechazado inmediatamente por cuenta bloqueada
-        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> usuarioService.login(dtoErroneo));
-        assertTrue(ex.getMessage().contains("bloqueada"));
+        // Se preserva el estado de cuenta original (no se muta a BLOQUEADA)
+        assertEquals(EstadoCuenta.ACTIVA, usuarioPrueba.getEstado());
     }
 
     @Test
-    @DisplayName("2. Login exitoso resetea contador de intentos fallidos y actualiza último acceso (HU06)")
+    @DisplayName("2. Login exitoso registra acceso y actualiza último acceso (HU06)")
     void testLoginExitosoReseteaIntentos() {
-        usuarioPrueba.setIntentosFallidos(3);
         when(usuarioRepository.findByRut("15.666.777-8")).thenReturn(Optional.of(usuarioPrueba));
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(i -> i.getArgument(0));
+        doNothing().when(politicaAccesoService).evaluarBloqueo("admin@colegio.cl");
 
         LoginRequestDTO dtoCorrecto = new LoginRequestDTO("15.666.777-8", "hash_secreto_123");
         LoginResponseDTO res = usuarioService.login(dtoCorrecto);
 
         assertNotNull(res.getToken());
-        assertEquals(0, usuarioPrueba.getIntentosFallidos());
         assertNotNull(usuarioPrueba.getUltimoAcceso());
+        verify(politicaAccesoService, times(1)).registrarIntento("admin@colegio.cl", true);
     }
 
     @Test
@@ -103,6 +115,7 @@ class UsuarioServiceTest {
         assertNotNull(creado.getId());
         assertEquals(EstadoCuenta.PRIMER_ACCESO, creado.getEstado());
         assertTrue(creado.getPasswordHash().startsWith("Edu"));
+        assertTrue(creado instanceof Encargado);
     }
 
     @Test
@@ -111,10 +124,10 @@ class UsuarioServiceTest {
         when(usuarioRepository.findById(1L)).thenReturn(Optional.of(usuarioPrueba));
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(i -> i.getArgument(0));
 
-        usuarioService.inactivar(1L);
+        usuarioService.inactivar(1L, 1L);
         assertEquals(EstadoCuenta.INACTIVA, usuarioPrueba.getEstado());
 
-        usuarioService.reactivar(1L);
+        usuarioService.reactivar(1L, 1L);
         assertEquals(EstadoCuenta.ACTIVA, usuarioPrueba.getEstado());
     }
 }
